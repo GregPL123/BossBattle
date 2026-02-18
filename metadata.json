@@ -1,0 +1,7 @@
+{
+  "name": "BossBattle AI",
+  "description": "A real-time voice sparring partner for difficult workplace conversations.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
