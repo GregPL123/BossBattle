@@ -1,6 +1,25 @@
 
 export type Language = 'en' | 'pl';
 
+export type BossMood = 'Analytical' | 'Impatient' | 'Impressed' | 'Neutral';
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  cost: number;
+  bonusType: string;
+  bonusValue: number;
+}
+
 export interface Scenario {
   id: string;
   name: string;
@@ -8,10 +27,12 @@ export interface Scenario {
   systemInstruction: string;
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Extreme';
   voiceName?: 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Aoede';
-  objectives: string[]; // Specific goals for the user
-  durationMinutes: number; // Time limit for the negotiation
-  ambience?: 'quiet' | 'office' | 'intense'; // Background noise type
-  isDaily?: boolean; // Bonus XP flag
+  objectives: string[];
+  durationMinutes: number;
+  ambience?: 'quiet' | 'office' | 'intense';
+  isDaily?: boolean;
+  stage?: number; 
+  totalStages?: number;
 }
 
 export enum ConnectionState {
@@ -23,9 +44,11 @@ export enum ConnectionState {
 
 export type InputMode = 'VAD' | 'PTT';
 
-export interface AudioVolumeState {
-  inputVolume: number;
-  outputVolume: number;
+export interface TacticalInsight {
+  text: string;
+  type: 'positive' | 'negative' | 'neutral';
+  timestamp: number;
+  mood?: BossMood;
 }
 
 export interface TranscriptItem {
@@ -36,17 +59,18 @@ export interface TranscriptItem {
   timestamp: number;
 }
 
-export interface AnalysisMetrics {
-  clarity: number;
-  persuasion: number;
-  empathy: number;
-  resilience: number;
+export interface SentimentPoint {
+  score: number;
+  segment: string;
+  reason: string;
+  timestamp: number; 
 }
 
-export interface CriticalMoment {
-  quote: string;
-  feedback: string;
-  type: 'Positive' | 'Negative';
+export interface TimestampedAdvice {
+  timestamp: number;
+  title: string;
+  advice: string;
+  type: 'tactical' | 'emotional' | 'linguistic';
 }
 
 export interface ObjectiveResult {
@@ -55,70 +79,71 @@ export interface ObjectiveResult {
   feedback: string;
 }
 
-export interface ImprovementSuggestion {
-  context: string;
+export interface TacticalSuggestion {
   userSaid: string;
   betterResponse: string;
-  reason: string;
-}
-
-export interface SentimentPoint {
-  segment: string;
-  score: number; // -5 to +5
-  reason: string;
+  reasoning: string;
+  audioData?: string; 
 }
 
 export interface AnalysisResult {
   score: number;
-  metrics: AnalysisMetrics;
+  metrics: {
+    clarity: number;
+    persuasion: number;
+    empathy: number;
+    resilience: number;
+  };
   feedback: string;
   strengths: string[];
   improvements: string[];
-  criticalMoments: CriticalMoment[];
-  objectiveResults: ObjectiveResult[];
-  suggestions: ImprovementSuggestion[];
-  sentimentTrend: SentimentPoint[];
-  markers?: number[]; 
+  bossMemory: string;
+  reputationChange: number;
+  discoveredTraits: string[];
+  discoveredWeaknesses?: string[];
+  userNeuralPatterns?: string[]; 
   outcome: 'Success' | 'Failure' | 'Neutral';
+  objectiveResult: ObjectiveResult[];
+  suggestions: TacticalSuggestion[];
+  sentimentTrend: SentimentPoint[];
+  timestampedAdvice: TimestampedAdvice[];
+  medals?: { id: string; label: string; icon: string; description: string }[];
+  markers?: number[];
   timedOut?: boolean;
+  nextStageUnlocked?: boolean;
 }
 
 export interface HistoryEntry extends AnalysisResult {
   id: string;
-  scenarioName: string;
   timestamp: number;
+  scenarioId: string;
+  scenarioName: string;
   feedbackShort: string;
 }
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  unlockedAt?: number;
-}
-
-export interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  cost: number;
-  bonusType: 'xp' | 'clarity' | 'persuasion' | 'empathy' | 'resilience';
-  bonusValue: number;
+export interface BossRelation {
+  memory: string;
+  reputation: number;
+  lastEncounter: number;
+  highestStage: number;
+  highestScore: number;
+  discoveredWeaknesses?: string[];
 }
 
 export interface UserProfile {
   xp: number;
   level: number;
   title: string;
-  activeTitle?: string; // Newly added: allow user to select active title
+  activeTitle?: string;
   battlesWon: number;
   battlesLost: number;
-  achievements: string[]; 
-  skills: string[]; 
+  achievements: string[];
+  skills: string[];
   skillPoints: number;
-  avatarSeed?: string;
   currentStreak: number;
   lastPlayedDate: string;
+  bossMemories: Record<string, BossRelation>;
+  globalTraits: string[];
+  userPatterns?: string[]; 
+  avatarSeed?: string;
 }

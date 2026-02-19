@@ -1,84 +1,92 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BossBattle AI - Negotiation Sparring</title>
+    <title>Negotiator Pro - Executive Performance Suite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              gray: {
-                850: '#1f2937',
-                900: '#111827',
-                950: '#030712',
+              navy: {
+                800: '#0f172a',
+                900: '#020617',
+                950: '#010409',
               },
-              primary: {
-                500: '#3b82f6',
-                600: '#2563eb',
+              os: {
+                primary: '#3b82f6',
+                accent: '#f59e0b', /* Gold/Amber accent */
+                success: '#10b981',
+                danger: '#ef4444',
+                slate: '#94a3b8'
               }
             },
-            animation: {
-              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'wave': 'wave 1.2s ease-in-out infinite',
-              'fade-in': 'fadeIn 0.5s ease-out forwards',
-              'slide-up': 'slideUp 0.5s ease-out forwards',
+            fontFamily: {
+              mono: ['JetBrains Mono', 'monospace'],
+              sans: ['Inter', 'sans-serif'],
             },
-            keyframes: {
-              wave: {
-                '0%, 100%': { height: '10%' },
-                '50%': { height: '60%' },
-              },
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              slideUp: {
-                '0%': { transform: 'translateY(20px)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              }
-            }
           }
         }
       }
     </script>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+      
       body {
-        background-color: #030712;
-        color: #f3f4f6;
+        background-color: #010409;
+        color: #f8fafc;
+        font-family: 'Inter', sans-serif;
+        letter-spacing: -0.01em;
       }
-      /* Custom scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
+      
+      .premium-glass {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
       }
-      ::-webkit-scrollbar-track {
-        background: #111827;
+
+      .executive-border {
+        border-left: 4px solid #f59e0b;
       }
-      ::-webkit-scrollbar-thumb {
-        background: #374151;
-        border-radius: 4px;
+
+      .text-glow {
+        text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #4b5563;
+
+      /* Custom Scrollbar Business */
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { 
+        background: #334155;
+        border-radius: 10px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 35px -5px rgba(37, 99, 235, 0.5);
       }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.4",
     "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
     "react/": "https://esm.sh/react@^19.2.4/",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "firebase/app": "https://esm.sh/firebase@10.8.0/app",
-    "firebase/auth": "https://esm.sh/firebase@10.8.0/auth",
-    "firebase/firestore": "https://esm.sh/firebase@10.8.0/firestore",
     "firebase/": "https://esm.sh/firebase@^12.9.0/"
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
