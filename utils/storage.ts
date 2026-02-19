@@ -1,31 +1,101 @@
 
-import { HistoryEntry, AnalysisResult, Scenario, UserProfile } from '../types';
-import { getInitialProfile, calculateLevel, getTitle } from './gamification';
+import { HistoryEntry, AnalysisResult, Scenario, UserProfile, BossRelation } from '../types';
+import { getInitialProfile, calculateLevel, getTitle, SKILL_TREE } from './gamification';
 
+const PROFILE_KEY = 'boss_battle_profile';
 const HISTORY_KEY = 'boss_battle_history';
 const CUSTOM_SCENARIOS_KEY = 'boss_battle_custom_scenarios';
-const PROFILE_KEY = 'boss_battle_profile';
 
-// --- History Management ---
+export const getUserProfile = (): UserProfile => {
+  try {
+    const data = localStorage.getItem(PROFILE_KEY);
+    if (!data) return getInitialProfile();
+    const parsed = JSON.parse(data);
+    if (!parsed.bossMemories) parsed.bossMemories = {};
+    if (!parsed.globalTraits) parsed.globalTraits = [];
+    if (!parsed.skills) parsed.skills = [];
+    if (parsed.skillPoints === undefined) parsed.skillPoints = 0;
+    return parsed;
+  } catch (e) {
+    return getInitialProfile();
+  }
+};
+
+export const unlockSkill = (skillId: string): UserProfile => {
+  const profile = getUserProfile();
+  const skill = SKILL_TREE.find(s => s.id === skillId);
+  
+  if (skill && profile.skillPoints >= skill.cost && !profile.skills.includes(skillId)) {
+    profile.skillPoints -= skill.cost;
+    profile.skills.push(skillId);
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  }
+  return profile;
+};
+
+export const updateUserProfile = (
+  xpGain: number, 
+  won: boolean,
+  newAchievements: string[] = [],
+  analysis?: AnalysisResult,
+  scenarioId?: string,
+  currentStage: number = 1
+): { profile: UserProfile, leveledUp: boolean } => {
+  const profile = getUserProfile();
+  const oldLevel = profile.level;
+  
+  profile.xp += xpGain;
+  profile.level = calculateLevel(profile.xp);
+  
+  if (profile.level > oldLevel) {
+    profile.skillPoints += (profile.level - oldLevel);
+  }
+  
+  profile.title = getTitle(profile.level);
+  
+  if (won) profile.battlesWon += 1;
+  else profile.battlesLost += 1;
+
+  if (analysis && scenarioId) {
+    const prev = profile.bossMemories[scenarioId] || { memory: "", reputation: 0, lastEncounter: 0, highestStage: 1, highestScore: 0, discoveredWeaknesses: [] };
+    
+    const nextStage = won ? Math.max(prev.highestStage || 1, currentStage + 1) : (prev.highestStage || 1);
+
+    // Merge weaknesses
+    const mergedWeaknesses = Array.from(new Set([...(prev.discoveredWeaknesses || []), ...(analysis.discoveredWeaknesses || [])]));
+
+    profile.bossMemories[scenarioId] = {
+      memory: analysis.bossMemory,
+      reputation: Math.max(-100, Math.min(100, prev.reputation + analysis.reputationChange)),
+      lastEncounter: Date.now(),
+      highestStage: nextStage,
+      highestScore: Math.max(prev.highestScore || 0, analysis.score),
+      discoveredWeaknesses: mergedWeaknesses
+    };
+
+    analysis.discoveredTraits.forEach(trait => {
+      if (!profile.globalTraits.includes(trait)) {
+        profile.globalTraits.push(trait);
+      }
+    });
+  }
+
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  return { profile, leveledUp: profile.level > oldLevel };
+};
 
 export const saveHistory = (scenario: Scenario, result: AnalysisResult) => {
-  try {
-    const existing = getHistory();
-    // Fix: HistoryEntry extends AnalysisResult, so it requires the 'feedback' property.
-    // We spread 'result' to include all required AnalysisResult fields and add HistoryEntry specific fields.
-    const newEntry: HistoryEntry = {
-      ...result,
-      id: Date.now().toString(),
-      scenarioName: scenario.name,
-      timestamp: Date.now(),
-      feedbackShort: result.feedback.substring(0, 120) + (result.feedback.length > 120 ? '...' : '')
-    };
-    
-    const updated = [newEntry, ...existing].slice(0, 20);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error("Failed to save history", e);
-  }
+  const history = getHistory();
+  const entry: HistoryEntry = {
+    ...result,
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    scenarioId: scenario.id,
+    scenarioName: scenario.name,
+    feedbackShort: result.feedback.substring(0, 100) + "..."
+  };
+  history.unshift(entry);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
 };
 
 export const getHistory = (): HistoryEntry[] => {
@@ -37,22 +107,12 @@ export const getHistory = (): HistoryEntry[] => {
   }
 };
 
+// Added missing clearHistory function to allow clearing locally stored session history
 export const clearHistory = () => {
   localStorage.removeItem(HISTORY_KEY);
 };
 
-// --- Custom Scenarios Management ---
-
-export const saveCustomScenario = (scenario: Scenario) => {
-  try {
-    const existing = getCustomScenarios();
-    const updated = [scenario, ...existing];
-    localStorage.setItem(CUSTOM_SCENARIOS_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error("Failed to save custom scenario", e);
-  }
-};
-
+// Added missing getCustomScenarios function to retrieve user-generated scenarios from local storage
 export const getCustomScenarios = (): Scenario[] => {
   try {
     const data = localStorage.getItem(CUSTOM_SCENARIOS_KEY);
@@ -62,87 +122,11 @@ export const getCustomScenarios = (): Scenario[] => {
   }
 };
 
-export const deleteCustomScenario = (id: string) => {
-  try {
-    const existing = getCustomScenarios();
-    const updated = existing.filter(s => s.id !== id);
-    localStorage.setItem(CUSTOM_SCENARIOS_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error("Failed to delete custom scenario", e);
+// Added missing saveCustomScenario function to persist user-generated scenarios locally
+export const saveCustomScenario = (scenario: Scenario) => {
+  const scenarios = getCustomScenarios();
+  if (!scenarios.find(s => s.id === scenario.id)) {
+    scenarios.push(scenario);
+    localStorage.setItem(CUSTOM_SCENARIOS_KEY, JSON.stringify(scenarios));
   }
-};
-
-// --- User Profile Management ---
-
-export const getUserProfile = (): UserProfile => {
-  try {
-    const data = localStorage.getItem(PROFILE_KEY);
-    if (!data) return getInitialProfile();
-    
-    const parsed = JSON.parse(data);
-    // Migration: Add fields if missing from old save
-    if (!parsed.achievements) parsed.achievements = [];
-    if (!parsed.skills) parsed.skills = [];
-    if (typeof parsed.skillPoints === 'undefined') parsed.skillPoints = 0;
-    if (typeof parsed.currentStreak === 'undefined') parsed.currentStreak = 0;
-    if (!parsed.lastPlayedDate) parsed.lastPlayedDate = '';
-    
-    return parsed;
-  } catch (e) {
-    return getInitialProfile();
-  }
-};
-
-export const updateUserProfile = (
-  xpGain: number, 
-  won: boolean,
-  newAchievements: string[] = []
-): { profile: UserProfile, leveledUp: boolean } => {
-  const profile = getUserProfile();
-  const oldLevel = profile.level;
-  
-  profile.xp += xpGain;
-  const newLevel = calculateLevel(profile.xp);
-  
-  if (newLevel > oldLevel) {
-    // Award 1 Skill Point per level up
-    profile.skillPoints += (newLevel - oldLevel);
-  }
-  
-  profile.level = newLevel;
-  profile.title = getTitle(profile.level);
-  
-  if (won) profile.battlesWon += 1;
-  else profile.battlesLost += 1;
-
-  // Streak Logic
-  const today = new Date().toISOString().split('T')[0];
-  if (profile.lastPlayedDate !== today) {
-     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-     if (profile.lastPlayedDate === yesterday) {
-        profile.currentStreak += 1;
-     } else {
-        const lastDate = new Date(profile.lastPlayedDate);
-        const diffTime = Math.abs(new Date(today).getTime() - lastDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-        if (diffDays > 1) profile.currentStreak = 1; 
-        else if (diffDays === 1) profile.currentStreak += 1;
-     }
-     if (profile.currentStreak === 0) profile.currentStreak = 1;
-     profile.lastPlayedDate = today;
-  }
-
-  // Add new unique achievements
-  newAchievements.forEach(id => {
-    if (!profile.achievements.includes(id)) {
-      profile.achievements.push(id);
-    }
-  });
-  
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  
-  return {
-    profile,
-    leveledUp: profile.level > oldLevel
-  };
 };

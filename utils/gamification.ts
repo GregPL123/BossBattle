@@ -2,20 +2,19 @@
 import { UserProfile, Achievement, AnalysisResult, Scenario, Skill } from '../types';
 
 export const TITLES = [
-  "Intern",
-  "Probationary",
-  "Associate",
-  "Senior Associate",
-  "Team Lead",
-  "Manager",
-  "Director",
-  "VP",
-  "C-Suite",
-  "CEO",
-  "Chairman",
-  "Master Negotiator",
-  "Wolf of AI Street"
+  "Intern", "Probationary", "Associate", "Senior Associate", "Team Lead",
+  "Manager", "Director", "VP", "C-Suite", "CEO", "Chairman",
+  "Master Negotiator", "Wolf of AI Street"
 ];
+
+export const ARCHETYPES = {
+  'The Tactician': { icon: '♟️', traits: ['Analytical', 'Concise'] },
+  'The Steamroller': { icon: '🚜', traits: ['Aggressive', 'Assertive'] },
+  'The Empath': { icon: '🌊', traits: ['Empathetic', 'Soft'] },
+  'The Stone Wall': { icon: '🧱', traits: ['Defensive', 'Resilient'] },
+  'The Silver Tongue': { icon: '🎙️', traits: ['Persuasive', 'Eloquent'] },
+  'The Rambler': { icon: '🌀', traits: ['Rambling', 'Verbose'] }
+};
 
 export const XP_PER_LEVEL = 500;
 
@@ -38,79 +37,49 @@ export const SKILL_TREE: Skill[] = [
   { id: 'high_roller', name: 'High Roller', description: '+20% XP for Wins.', icon: '🎰', cost: 3, bonusType: 'xp', bonusValue: 20 },
 ];
 
-export const calculateLevel = (xp: number): number => {
-  return Math.floor(xp / XP_PER_LEVEL) + 1;
+export const calculateLevel = (xp: number): number => Math.floor(xp / XP_PER_LEVEL) + 1;
+export const getTitle = (level: number): string => TITLES[Math.min(level - 1, TITLES.length - 1)];
+
+export const getDifficultyMultiplier = (stage: number): number => {
+  // Stage 1: 1.0x, Stage 2: 1.25x, Stage 3: 1.5x etc.
+  return 1 + (stage - 1) * 0.25;
 };
 
-export const getTitle = (level: number): string => {
-  const index = Math.min(level - 1, TITLES.length - 1);
-  return TITLES[index];
+export const getArchetype = (traits: string[]) => {
+  for (const [name, data] of Object.entries(ARCHETYPES)) {
+    if (data.traits.some(t => traits.includes(t))) return { name, icon: data.icon };
+  }
+  return { name: 'The Unknown', icon: '👤' };
 };
 
-export const getNextLevelXp = (level: number): number => {
-  return level * XP_PER_LEVEL;
-};
-
-export const calculateXpGain = (score: number, outcome: 'Success' | 'Failure' | 'Neutral', difficulty: string, isDaily?: boolean, activeSkills: string[] = []): number => {
+export const calculateXpGain = (score: number, outcome: 'Success' | 'Failure' | 'Neutral', difficulty: string, isDaily?: boolean, stage: number = 1): number => {
   let base = score * 2; 
-  
   if (outcome === 'Success') base += 100;
   if (outcome === 'Failure') base += 20; 
-  
-  let multiplier = 1;
-  if (difficulty === 'Medium') multiplier = 1.2;
-  if (difficulty === 'Hard') multiplier = 1.5;
-  if (difficulty === 'Extreme') multiplier = 2.0;
-
-  let finalXp = Math.floor(base * multiplier);
-
-  // Skill Bonuses
-  if (activeSkills.includes('high_roller') && outcome === 'Success') {
-    finalXp = Math.floor(finalXp * 1.2);
-  }
-
-  if (isDaily) finalXp += 100;
-
-  return finalXp;
+  const diffMultiplier = difficulty === 'Medium' ? 1.2 : difficulty === 'Hard' ? 1.5 : difficulty === 'Extreme' ? 2.0 : 1;
+  const stageMultiplier = 1 + (stage - 1) * 0.1; // 10% more XP per stage
+  return Math.floor(base * diffMultiplier * stageMultiplier) + (isDaily ? 100 : 0);
 };
 
-export const checkNewAchievements = (
-  currentProfile: UserProfile, 
-  result: AnalysisResult, 
-  scenario: Scenario
-): Achievement[] => {
+export const checkNewAchievements = (currentProfile: UserProfile, result: AnalysisResult, scenario: Scenario): Achievement[] => {
   const newUnlocked: Achievement[] = [];
   const existingIds = new Set(currentProfile.achievements);
-
   const check = (id: string, condition: boolean) => {
     if (condition && !existingIds.has(id)) {
       const ach = ACHIEVEMENTS_LIST.find(a => a.id === id);
       if (ach) newUnlocked.push(ach);
     }
   };
-
   check('first_blood', true);
   check('negotiator', result.outcome === 'Success');
   check('silver_tongue', result.score >= 90);
   check('iron_will', result.outcome === 'Success' && scenario.difficulty === 'Hard');
   check('godslayer', result.outcome === 'Success' && scenario.difficulty === 'Extreme');
-  check('resilient', result.outcome === 'Failure');
-  const potentialLevel = calculateLevel(currentProfile.xp + 100); 
-  check('veteran', potentialLevel >= 5);
-  check('streaker', currentProfile.currentStreak >= 3);
-
   return newUnlocked;
 };
 
 export const getInitialProfile = (): UserProfile => ({
-  xp: 0,
-  level: 1,
-  title: TITLES[0],
-  battlesWon: 0,
-  battlesLost: 0,
-  achievements: [],
-  skills: [],
-  skillPoints: 0,
-  currentStreak: 0,
-  lastPlayedDate: ''
+  xp: 0, level: 1, title: TITLES[0], battlesWon: 0, battlesLost: 0,
+  achievements: [], skills: [], skillPoints: 0, currentStreak: 0,
+  lastPlayedDate: '', bossMemories: {}, globalTraits: []
 });
