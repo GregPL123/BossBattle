@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Scenario, UserProfile, Language } from '../types';
 import MicTester from './MicTester';
 import { playSfx } from '../utils/sound';
@@ -18,131 +18,124 @@ interface LobbyProps {
 }
 
 const Lobby: React.FC<LobbyProps> = ({ 
-  scenario, 
-  userProfile, 
-  inputDeviceId, 
-  micThreshold, 
-  onStart, 
-  onBack,
-  onSettings,
-  onSetThreshold,
-  lang
+  scenario, userProfile, inputDeviceId, micThreshold, onStart, onBack, onSettings, lang
 }) => {
   const t = translations[lang];
-  const [isBlindMode, setIsBlindMode] = useState(() => localStorage.getItem('boss_battle_blind_mode') === 'true');
+  const [isBlindMode, setIsBlindMode] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [calibProgress, setCalibProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
   
-  const calibRef = useRef<{max: number}>({max: 0});
-
-  const handleCalibrate = async () => {
-    if (isCalibrating) return;
+  const startCalibration = () => {
     setIsCalibrating(true);
-    setCalibProgress(0);
-    calibRef.current.max = 0;
-    playSfx('click');
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: inputDeviceId ? { deviceId: { exact: inputDeviceId } } : true 
-      });
-      const audioCtx = new AudioContext();
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-      source.connect(analyser);
-
-      const dataArray = new Float32Array(analyser.fftSize);
-      const startTime = Date.now();
-      const duration = 3000;
-
-      const check = () => {
-        const now = Date.now();
-        const elapsed = now - startTime;
-        setCalibProgress((elapsed / duration) * 100);
-
-        analyser.getFloatTimeDomainData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i] * dataArray[i];
-        }
-        const rms = Math.sqrt(sum / dataArray.length);
-        if (rms > calibRef.current.max) calibRef.current.max = rms;
-
-        if (elapsed < duration) {
-          requestAnimationFrame(check);
-        } else {
-          // Calibration done
-          const safetyMargin = 0.005;
-          const finalThreshold = Math.min(0.1, calibRef.current.max + safetyMargin);
-          onSetThreshold(finalThreshold);
+    setProgress(0);
+    playSfx('connect');
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
           setIsCalibrating(false);
           playSfx('success');
-          stream.getTracks().forEach(t => t.stop());
-          audioCtx.close();
+          return 100;
         }
-      };
-
-      requestAnimationFrame(check);
-    } catch (e) {
-      console.error(e);
-      setIsCalibrating(false);
-    }
+        return prev + 5;
+      });
+    }, 60);
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 animate-fade-in flex flex-col md:flex-row gap-8 items-start justify-center min-h-[60vh]">
-      <div className="flex-1 w-full space-y-6">
-        <button onClick={() => { playSfx('click'); onBack(); }} className="text-gray-400 hover:text-white flex items-center gap-2 text-sm font-bold transition-colors">
-          ← {t.abortMission}
-        </button>
-        <h1 className="text-4xl font-black text-white mb-2 tracking-tight uppercase italic transform -skew-x-6">{scenario.name}</h1>
-        <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 backdrop-blur-sm">
-           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">🎯 {t.missionObjectives}</h3>
-           <ul className="space-y-4">
-             {scenario.objectives.map((obj, i) => (
-               <li key={i} className="flex gap-3 items-start group">
-                 <div className="w-6 h-6 rounded-full bg-gray-800 border border-gray-700 text-gray-500 flex items-center justify-center text-xs font-bold">{i + 1}</div>
-                 <p className="text-gray-300 text-sm leading-relaxed">{obj}</p>
-               </li>
-             ))}
-           </ul>
-        </div>
-      </div>
-
-      <div className="w-full md:w-80 shrink-0 space-y-6">
-         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-1 overflow-hidden">
-            <div className="bg-gray-950 p-6 rounded-xl text-center">
-               <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=boss&backgroundColor=1f2937`} alt="Boss" className="w-24 h-24 mx-auto rounded-full mb-4 shadow-lg border-2 border-gray-700" />
-               <div className="text-sm font-bold text-gray-400 uppercase mb-1">{t.opponent}</div>
-               <div className="text-white font-bold text-lg">{scenario.voiceName}</div>
-               <div className="flex items-center justify-center gap-2 mt-2">
-                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${scenario.difficulty === 'Extreme' ? 'bg-red-900 text-red-400' : 'bg-blue-900 text-blue-400'}`}>{t[scenario.difficulty.toLowerCase() as keyof typeof t] as string}</span>
-                 <span className="text-[10px] text-gray-500 px-2 py-0.5 border border-gray-800 rounded uppercase">{scenario.durationMinutes} MIN</span>
-               </div>
-            </div>
-         </div>
-
-         <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-xs font-bold text-gray-500 uppercase">{t.micInput}</h3>
-              <button 
-                onClick={handleCalibrate} 
-                disabled={isCalibrating}
-                className={`text-[10px] font-black px-2 py-1 rounded transition-all ${isCalibrating ? 'bg-blue-600 text-white animate-pulse' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
-              >
-                {isCalibrating ? `${Math.round(calibProgress)}%` : 'AUTOCALIBRATE'}
+    <div className="min-h-screen bg-navy-950 p-12 flex flex-col items-center justify-center relative">
+      <div className="max-w-5xl w-full grid grid-cols-12 gap-8 relative z-10">
+        
+        {/* LEFT: MISSION BRIEFING */}
+        <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
+           <div className="premium-glass rounded-3xl p-12 border border-white/5 relative overflow-hidden shadow-2xl">
+              <button onClick={onBack} className="text-[10px] font-bold text-os-slate uppercase tracking-widest mb-10 hover:text-white transition-all flex items-center gap-2 group">
+                <span className="transform group-hover:-translate-x-1 transition-transform">←</span> Exit Briefing
               </button>
-            </div>
-            <MicTester deviceId={inputDeviceId} threshold={micThreshold} />
-         </div>
+              
+              <div className="mb-10">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-os-primary"></div>
+                  <span className="text-[10px] font-bold text-os-slate uppercase tracking-widest">Case Study Prepared</span>
+                </div>
+                <h1 className="text-5xl font-extrabold text-white tracking-tight mb-4">
+                  {scenario.name}
+                </h1>
+                <div className="flex gap-4 items-center">
+                   <span className="text-[10px] bg-os-primary/10 text-os-primary border border-os-primary/20 px-4 py-1.5 rounded-full font-bold uppercase tracking-widest">{scenario.difficulty} Level</span>
+                   <span className="text-[10px] text-os-slate font-medium">Session Time: {scenario.durationMinutes}m</span>
+                </div>
+              </div>
 
-         <button 
-           onClick={() => { playSfx('success'); onStart(isBlindMode); }} 
-           className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xl rounded-2xl shadow-xl flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] active:scale-95"
-         >
-           <span>{t.start}</span> →
-         </button>
+              <div className="space-y-8">
+                 <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                    <p className="text-os-slate text-sm font-medium leading-relaxed">
+                      {scenario.description}
+                    </p>
+                 </div>
+                 
+                 <div className="space-y-4">
+                    <span className="text-[10px] font-bold text-os-slate uppercase tracking-widest block">Key Performance Deliverables</span>
+                    <div className="grid grid-cols-1 gap-3">
+                       {scenario.objectives.map((obj, i) => (
+                          <div key={i} className="flex gap-4 items-center bg-navy-900/40 p-4 rounded-xl border border-white/5">
+                             <span className="text-os-primary font-bold text-sm">0{i+1}</span>
+                             <span className="text-[11px] text-os-slate font-semibold uppercase tracking-wide">{obj}</span>
+                          </div>
+                       ))}
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
+
+        {/* RIGHT: SYSTEM VERIFICATION */}
+        <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
+           <div className="premium-glass rounded-3xl p-8 space-y-8 border border-white/5">
+              <div className="flex items-center justify-between">
+                 <span className="text-[11px] font-bold text-white uppercase tracking-widest">Pre-session Verification</span>
+                 <button onClick={startCalibration} className="text-[9px] font-bold text-os-primary uppercase border border-os-primary/20 px-4 py-1.5 rounded-full hover:bg-os-primary/5">
+                   {isCalibrating ? 'Syncing...' : 'Quick Sync'}
+                 </button>
+              </div>
+
+              <div className="space-y-6">
+                 <MicTester deviceId={inputDeviceId} threshold={micThreshold} />
+                 
+                 {isCalibrating && (
+                   <div className="space-y-2">
+                      <div className="h-1 bg-white/5 w-full rounded-full overflow-hidden">
+                         <div className="h-full bg-os-primary transition-all" style={{ width: `${progress}%` }}></div>
+                      </div>
+                   </div>
+                 )}
+
+                 <div className="flex items-center justify-between p-6 bg-navy-900 rounded-2xl border border-white/5">
+                    <div className="flex flex-col">
+                       <span className="text-[11px] font-bold text-white uppercase tracking-widest">Focus Mode</span>
+                       <span className="text-[9px] text-os-slate font-medium uppercase mt-1">Hide Live Transcription</span>
+                    </div>
+                    <button 
+                      onClick={() => setIsBlindMode(!isBlindMode)}
+                      className={`w-12 h-6 rounded-full relative transition-all ${isBlindMode ? 'bg-os-primary' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isBlindMode ? 'right-1' : 'left-1'}`}></div>
+                    </button>
+                 </div>
+              </div>
+           </div>
+
+           <div className="flex-1 flex flex-col justify-end">
+              <button 
+                 onClick={() => onStart(isBlindMode)}
+                 className="btn-primary text-white py-10 rounded-2xl flex flex-col items-center justify-center gap-1"
+              >
+                 <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Initiate Briefing</span>
+                 <span className="text-3xl font-extrabold uppercase tracking-widest">Begin</span>
+              </button>
+           </div>
+        </div>
+
       </div>
     </div>
   );
